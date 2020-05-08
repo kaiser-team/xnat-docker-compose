@@ -46,26 +46,51 @@ services:
       - "80"
     links:
       - xnat-web
-
-  # prometheus:
-  #   image: prom/prometheus
-  #   volumes:
-  #     - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml
-  #   command:
-  #     - '-config.file=/etc/prometheus/prometheus.yaml'
-  #   ports:
-  #     - '9090:9090'
-  #   links:
-  #     - cadvisor
-  #
-  # cadvisor:
-  #   image: google/cadvisor
-  #   volumes:
-  #     - /:/rootfs:ro
-  #     - /var/run:/var/run:rw
-  #     - /sys:/sys:ro
-  #     - /var/lib/docker/:/var/lib/docker:ro
-  #   ports:
-  #     - "8082:8080"
-  #   expose:
-  #     - 8082
+  ldap:
+    image: dcm4che/slapd-dcm4chee:2.4.48-22.1
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    ports:
+      - "389:389"
+    env_file: docker-compose.env
+    volumes:
+      - ./dcm4chee-arc/ldap:/var/lib/openldap/openldap-data
+      - ./dcm4chee-arc/slapd.d:/etc/openldap/slapd.d
+  db:
+    image: dcm4che/postgres-dcm4chee:12.2-22
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    ports:
+      - "5432:5432"
+    env_file: docker-compose.env
+    volumes:
+      - ./dcm4chee-arc/db:/var/lib/postgresql/data
+  arc:
+    image: dcm4che/dcm4chee-arc-psql:5.22.1
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+      - "9990:9990"
+      - "9993:9993"
+      - "11112:11112"
+      - "2762:2762"
+      - "2575:2575"
+      - "12575:12575"
+    env_file: docker-compose.env
+    environment:
+      WILDFLY_CHOWN: /opt/wildfly/standalone /storage
+      WILDFLY_WAIT_FOR: ldap:389 db:5432
+    depends_on:
+      - ldap
+      - db
+    volumes:
+      - ./dcm4chee-arc/wildfly:/opt/wildfly/standalone
+      - ./dcm4chee-arc/storage:/storage
